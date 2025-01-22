@@ -1,0 +1,22 @@
+{
+    "name": "frontend",
+    "version": "1.0.0",
+    "description": "Frontend para el chat online con Next.js y SCSS",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "next lint"
+    },
+    "dependencies": {
+      "next": "^12.0.0",
+      "react": "^18.0.0",
+      "react-dom": "^18.0.0",
+      "sass": "^1.45.0",
+      "socket.io-client": "^4.5.0"
+    },
+    "devDependencies": {
+      "eslint": "^8.0.0",
+      "eslint-config-next": "^12.0.0"
+    }
+  }
