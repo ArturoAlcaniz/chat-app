@@ -1,20 +1,37 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 import io from 'socket.io-client';
 import styles from '../styles/Chat.module.scss';
 
-const socket = io('http://localhost:3001', {
+const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001', {
   withCredentials: true,
 });
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState('');
-  const [username, setUsername] = useState('');
+  const [content, setContent] = useState('');
+  const [username, setUsername] = useState(null); // Inicializa como null
   const messagesEndRef = useRef(null);
+  const router = useRouter();
 
-  // Cargar mensajes al iniciar
+  // Acceder a localStorage solo en el cliente
   useEffect(() => {
-    fetch('http://localhost:3001/chat/messages')
+    if (typeof window !== 'undefined') {
+      const storedUsername = localStorage.getItem('username');
+      setUsername(storedUsername);
+
+      // Redirigir si no hay usuario
+      if (!storedUsername) {
+        router.push('/');
+      }
+    }
+  }, [router]);
+
+  // Cargar mensajes al iniciar (solo si hay usuario)
+  useEffect(() => {
+    if (!username) return; // Espera hasta tener el username
+
+    fetch('http://localhost:3001/messages')
       .then((response) => response.json())
       .then((data) => setMessages(data));
 
@@ -25,22 +42,28 @@ export default function Chat() {
     return () => {
       socket.off('chatMessage');
     };
-  }, []);
+  }, [username]); // Dependencia de username
 
   // Desplazarse al final de los mensajes cuando se actualizan
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Enviar mensaje
   const sendMessage = () => {
     if (!username) {
       alert('Debes iniciar sesión para enviar mensajes.');
       return;
     }
 
-    if (message.trim()) {
-      socket.emit('chatMessage', { username, message });
-      setMessage('');
+    if (content.trim()) {
+      const newMessage = {
+        username,
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      socket.emit('chatMessage', newMessage);
+      setContent('');
     }
   };
 
@@ -50,29 +73,27 @@ export default function Chat() {
       <div className={styles.chatBox}>
         {messages.map((msg, index) => (
           <div key={index} className={styles.message}>
-            <strong>{msg.username}:</strong> {msg.message}
+            <strong>{msg.username}:</strong> {msg.content}{' '}
+            <div className={styles.timestamp}>
+              {new Date(msg.timestamp).toLocaleString()}
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <input
-        type="text"
-        placeholder="Nombre de usuario"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className={styles.input}
-      />
-      <input
-        type="text"
-        placeholder="Escribe un mensaje..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-        className={styles.input}
-      />
-      <button onClick={sendMessage} className={styles.button}>
-        Enviar
-      </button>
+      <div className={styles.inputContainer}>
+        <input
+          type="text"
+          placeholder="Escribe un mensaje..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          className={styles.input}
+        />
+        <button onClick={sendMessage} className={styles.button}>
+          Enviar
+        </button>
+      </div>
     </div>
   );
 }

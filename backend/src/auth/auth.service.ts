@@ -1,52 +1,58 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as crypto from 'crypto'; // Usamos crypto para encriptación manual
+import { UserService } from '../user/user.service';
+import * as bcrypt from 'bcryptjs';
+import { User } from '../user/user.entity';
+import { LoginDto } from 'src/user/dto/login.dto';
+import { CreateUserDto } from 'src/user/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
-    constructor(private jwtService: JwtService) {}
+  constructor(
+    private userService: UserService, // Inyecta el UserService
+    private jwtService: JwtService, // Inyecta el JwtService
+  ) {}
 
-    /**
-     * Hashea una contraseña usando SHA-256.
-     * @param password Contraseña en texto plano.
-     * @returns Contraseña hasheada.
-     */
-    private hashPassword(password: string): string {
-        return crypto
-            .createHash('sha256') // Usamos SHA-256 para hashing
-            .update(password)
-            .digest('hex'); // Devuelve el hash en formato hexadecimal
+  // Validar usuario (para login)
+  async validateUser(loginDto: LoginDto): Promise<User | null> {
+    const user = await this.userService.findOneByUsername(
+      loginDto.username,
+    );
+
+    if (user && bcrypt.compareSync(loginDto.password, user.password)) {
+      return user;
+    }
+    return null;
+  }
+
+  // Iniciar sesión
+  async login(loginDto: LoginDto): Promise<{ access_token: string, username: string }> {
+    const user = await this.validateUser(loginDto);
+    if (!user) {
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    /**
-     * Valida las credenciales del usuario.
-     * @param username Nombre de usuario.
-     * @param password Contraseña en texto plano.
-     * @returns El usuario si las credenciales son válidas, de lo contrario null.
-     */
-    async validateUser(username: string, password: string): Promise<any> {
-        // Simulación de base de datos
-        const user = {
-            username: 'user',
-            password: this.hashPassword('password'), // Hasheamos la contraseña manualmente
-        };
+    // Generar token JWT
+    const payload = { username: user.username, sub: user.id };
+    return {
+      access_token: this.jwtService.sign(payload),
+      username: user.username,
+    };
+  }
 
-        // Compara el nombre de usuario y el hash de la contraseña
-        if (username === user.username && this.hashPassword(password) === user.password) {
-            return user;
-        }
-        return null;
+  // Registrar un nuevo usuario
+  async register(registerDto: CreateUserDto): Promise<User> {
+    const existingUser = await this.userService.findOneByUsername(
+      registerDto.username,
+    );
+    if (existingUser) {
+      throw new UnauthorizedException('El nombre de usuario ya existe');
     }
 
-    /**
-     * Genera un token JWT para el usuario.
-     * @param user Datos del usuario.
-     * @returns Un objeto con el token de acceso.
-     */
-    async login(user: any) {
-        const payload = { username: user.username };
-        return {
-            access_token: this.jwtService.sign(payload),
-        };
-    }
+    const newUser = await this.userService.create(
+      registerDto,
+    );
+
+    return newUser;
+  }
 }

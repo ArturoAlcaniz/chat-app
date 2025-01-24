@@ -1,27 +1,23 @@
-# Usa una versión más reciente de Node.js (por ejemplo, Node.js 18 o 20)
-FROM node:18
+# Usar una imagen base de Node.js
+FROM node:16-alpine
 
-# Instala dependencias de compilación (necesarias para módulos nativos como bcrypt)
-RUN apt-get update && apt-get install -y build-essential python3
-
-# Establece el directorio de trabajo
+# Establecer el directorio de trabajo
 WORKDIR /app
 
-# Copia los archivos de configuración
-COPY package*.json ./
-COPY tsconfig.json ./
+# Copiar los archivos de dependencias
+COPY package.json yarn.lock* ./
 
-# Instala las dependencias
-RUN npm install
+# Instalar dependencias
+RUN yarn install
 
-# Copia el resto del código
+# Copiar el resto del código
 COPY . .
 
-# Compila el proyecto
-RUN npm run build
+# Construir la aplicación
+RUN yarn build
 
-# Expone el puerto
-EXPOSE 3000
+# Exponer el puerto 3001
+EXPOSE 3001
 
-# Inicia la aplicación
-CMD ["npm", "run", "start:prod"]
+# Comando para iniciar la aplicación
+CMD ["yarn", "start:prod"]
